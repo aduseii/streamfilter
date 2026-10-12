@@ -182,11 +182,19 @@ async function gatherStreams(c, type, id) {
     return (data.streams || []).map((s) => ({ s, source: name }));
   }));
   const all = [];
+  const report = [];
   results.forEach((r, i) => {
-    if (r.status === 'fulfilled') all.push(...r.value);
-    else console.warn(`[source] ${c.upstreams[i]} failed: ${r.reason && r.reason.message}`);
+    const host = new URL(c.upstreams[i]).hostname;
+    if (r.status === 'fulfilled') {
+      all.push(...r.value);
+      report.push({ source: host, ok: true, results: r.value.length, torrents: r.value.filter((x) => x.s.infoHash).length });
+    } else {
+      const msg = r.reason && (r.reason.name === 'TimeoutError' ? 'timed out' : r.reason.message);
+      console.warn(`[source] ${host} failed: ${msg}`);
+      report.push({ source: host, ok: false, error: msg });
+    }
   });
-  return all;
+  return { all, report };
 }
 
 /* ---------------- pipeline ---------------- */
@@ -224,13 +232,33 @@ function applyFilters(items, c) {
 async function markCached(list, c) {
   const svc = SERVICES[c.service];
   const hashes = [...new Set(list.filter((x) => x.p.hash).map((x) => x.p.hash))].slice(0, 200);
-  if (!svc.canCheck || !hashes.length) return;
+  if (!svc.canCheck) return { ok: true, note: `${svc.label} can't check the cache ahead of time` };
+  if (!hashes.length) return { ok: true, note: 'nothing to check' };
   try {
     const cached = await svc.check(c.apiKey, hashes);
     for (const x of list) if (x.p.hash && hashes.includes(x.p.hash)) x.p.cached = cached.has(x.p.hash);
+    return { ok: true, checked: hashes.length, cached: cached.size };
   } catch (e) {
     console.warn(`[${svc.label}] cache check failed: ${e.message}`);
+    return { ok: false, error: e.message };
   }
+}
+
+async function runPipeline(c, type, id, base, cfgStr) {
+  const { all, report } = await gatherStreams(c, type, id);
+  const filtered = applyFilters(all, c);
+  const cache = await markCached(filtered, c);
+  const limited = applyLimits(filtered, c);
+  return {
+    streams: toStremio(limited, c, base, cfgStr, id),
+    debug: {
+      sources: report,
+      fromSources: all.length,
+      afterFilters: filtered.length,
+      debridCheck: cache,
+      final: limited.length,
+    },
+  };
 }
 
 function applyLimits(list, c) {
@@ -339,12 +367,33 @@ const server = http.createServer(async (req, res) => {
       const key = `${cfgStr}|${type}|${id}`;
       let streams = streamCache.get(key);
       if (!streams) {
-        const filtered = applyFilters(await gatherStreams(c, type, id), c);
-        await markCached(filtered, c);
-        streams = toStremio(applyLimits(filtered, c), c, baseUrl(req), cfgStr, id);
+        const out = await runPipeline(c, type, id, baseUrl(req), cfgStr);
+        streams = out.streams;
         if (streams.length) streamCache.set(key, streams);
+        else {
+          // show why nothing came back, right inside Stremio
+          const d = out.debug;
+          const failed = d.sources.find((x) => !x.ok);
+          const why = failed ? `Source ${failed.source} failed: ${failed.error}`
+            : !d.fromSources ? 'Your source returned no results for this title'
+            : !d.afterFilters ? 'Your filters removed every result'
+            : d.debridCheck.ok === false ? `${SERVICES[c.service].label} error: ${d.debridCheck.error}`
+            : 'Nothing cached on your debrid service for this title';
+          streams = [{
+            name: `${c.addonName}\n⚠️`,
+            description: `${why}\nTap to open your settings`,
+            title: `${why}\nTap to open your settings`,
+            externalUrl: `${baseUrl(req)}/${cfgStr}/configure`,
+          }];
+        }
       }
-      return send(res, 200, { streams }, undefined, { 'Cache-Control': 'max-age=600' });
+      return send(res, 200, { streams }, undefined, { 'Cache-Control': streams[0]?.externalUrl ? 'no-store' : 'max-age=600' });
+    }
+
+    // test: /:cfg/test/:type/:id
+    if (parts[1] === 'test' && parts.length === 4 && /^(movie|series)$/.test(parts[2])) {
+      const out = await runPipeline(c, parts[2], decodeURIComponent(parts[3]), baseUrl(req), cfgStr);
+      return send(res, 200, { ...out.debug, sample: out.streams.slice(0, 5).map((x) => x.name.replace('\n', ' ')) }, undefined, { 'Cache-Control': 'no-store' });
     }
 
     // play: /:cfg/play/:hash/:fileIdx/:se/:filename

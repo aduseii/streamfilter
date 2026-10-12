@@ -101,6 +101,11 @@
   #msg { max-width:680px; margin:0 auto 8px; font-size:13px; color:var(--muted); word-break:break-all; min-height:0; }
   #msg.err { color:var(--danger); }
   .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:24px; }
+  #testOut { margin-top:12px; font-size:13.5px; }
+  #testOut .row { display:flex; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  #testOut .row:first-child { border-top:0; }
+  #testOut .ic { width:20px; flex:none; text-align:center; }
+  #testOut .sub2 { color:var(--muted); }
   .keylink { float:right; font-weight:500; color:var(--accent2); text-decoration:none; font-size:12.5px; }
   .keyrow { display:flex; gap:8px; }
   .keyrow input { flex:1; font-family:ui-monospace, Menlo, monospace; font-size:13px; }
@@ -196,6 +201,13 @@
         <div><label class="field">Source timeout (seconds)</label><input type="number" id="timeoutS" min="1" max="30" step="1"></div>
       </div>
     </details>
+  </section>
+
+  <section id="testBox">
+    <h2><span class="num">5</span>Test it</h2>
+    <p class="desc">Checks your source, filters and debrid key with a well-known movie (The Shawshank Redemption) before you install.</p>
+    <button class="btn secondary" id="test" type="button" style="width:100%">Test my setup</button>
+    <div id="testOut"></div>
   </section>
 
   <p class="foot">Your settings and key are saved inside your install link, so don't share that link. To change settings later, use the add-on's ⚙️ button in Stremio.</p>
@@ -297,6 +309,31 @@ function build() {
   msg.className = ''; msg.textContent = '';
   return url;
 }
+
+$('test').onclick = async () => {
+  const url = build();
+  if (!url) return;
+  const out = $('testOut');
+  out.innerHTML = '<div class="row"><span class="ic">⏳</span><span>Testing… (can take up to a minute if the site was asleep)</span></div>';
+  try {
+    const r = await fetch(url.replace('/manifest.json', '/test/movie/tt0111161'));
+    const d = await r.json();
+    const esc = (t) => String(t).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+    const row = (ok, text, sub) => `<div class="row"><span class="ic">${ok ? '✅' : '❌'}</span><span>${esc(text)}${sub ? `<br><span class="sub2">${esc(sub)}</span>` : ''}</span></div>`;
+    let html = '';
+    for (const s of d.sources) html += s.ok
+      ? row(s.torrents > 0, `Source ${s.source}: ${s.results} results, ${s.torrents} torrents`, s.torrents ? '' : 'This link gives no torrents. Use the add-on link with its debrid options left empty.')
+      : row(false, `Source ${s.source} failed: ${s.error}`, /403|429|blocked/i.test(s.error) ? 'This source is blocking your server. Try another source link.' : 'Check the link is right.');
+    html += row(d.afterFilters > 0, `After your filters: ${d.afterFilters} left`, d.afterFilters ? '' : 'Your filters removed everything. Loosen them a bit.');
+    const dc = d.debridCheck;
+    html += dc.ok === false ? row(false, `Debrid key problem: ${dc.error}`, 'Double-check the key and the service you picked.')
+      : row(true, dc.checked != null ? `Debrid: ${dc.cached} of ${dc.checked} cached` : `Debrid: ${dc.note}`);
+    html += row(d.final > 0, `Streams Stremio will show: ${d.final}`, d.sample.join(' · '));
+    out.innerHTML = html;
+  } catch (e) {
+    out.innerHTML = `<div class="row"><span class="ic">❌</span><span>Couldn't reach your server: ${e.message}</span></div>`;
+  }
+};
 
 $('install').onclick = (e) => {
   e.preventDefault();
