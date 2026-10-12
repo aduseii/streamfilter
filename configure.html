@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamFilter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0b0c10; --card:#14161c; --card2:#1b1e26; --line:#262a35;
+    --text:#eceef3; --muted:#8c93a1; --accent:#8b6cff; --accent2:#5ad1ff; --danger:#ff7a7a;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; color:var(--text); font:15px/1.5 Inter, system-ui, sans-serif;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(139,108,255,.18), transparent 60%),
+      radial-gradient(700px 400px at 100% 0%, rgba(90,209,255,.10), transparent 60%),
+      var(--bg);
+    min-height:100vh;
+  }
+  main { max-width:680px; margin:0 auto; padding:40px 16px 140px; }
+  header { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+  .logo {
+    width:48px; height:48px; border-radius:14px; flex:none;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    display:grid; place-items:center; box-shadow:0 8px 24px rgba(139,108,255,.35);
+  }
+  .logo svg { width:26px; height:26px; }
+  h1 { font-size:26px; margin:0; letter-spacing:-.02em; }
+  .sub { color:var(--muted); margin:2px 0 0; font-size:14px; }
+
+  section {
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:20px; margin-bottom:16px;
+  }
+  h2 { font-size:15px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  h2 .num { width:22px; height:22px; border-radius:50%; background:var(--card2); border:1px solid var(--line);
+            font-size:12px; display:grid; place-items:center; color:var(--muted); }
+  .desc { color:var(--muted); font-size:13px; margin:0 0 14px; }
+
+  label.field { display:block; font-size:13px; font-weight:600; margin:14px 0 6px; color:#c9cdd6; }
+  input[type=text], input[type=password], input[type=number], textarea {
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--bg); color:var(--text); font:inherit; transition:border-color .15s;
+  }
+  input:focus, textarea:focus { outline:none; border-color:var(--accent); }
+  textarea { min-height:92px; resize:vertical; font-size:13px; font-family:ui-monospace, Menlo, monospace; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .grid2 label.field { margin-top:0; }
+
+  /* toggle rows */
+  .toggle { display:flex; justify-content:space-between; align-items:center; gap:12px;
+            padding:12px 0; border-top:1px solid var(--line); cursor:pointer; }
+  .toggle:first-of-type { border-top:0; }
+  .toggle b { display:block; font-weight:600; font-size:14px; }
+  .toggle small { color:var(--muted); font-size:12.5px; }
+  .switch { position:relative; width:42px; height:24px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; position:absolute; }
+  .switch span { position:absolute; inset:0; background:var(--card2); border:1px solid var(--line);
+                 border-radius:999px; transition:.2s; }
+  .switch span::after { content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+                        border-radius:50%; background:#c9cdd6; transition:.2s; }
+  .switch input:checked + span { background:var(--accent); border-color:var(--accent); }
+  .switch input:checked + span::after { transform:translateX(18px); background:#fff; }
+
+  /* chips & segmented */
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips label { cursor:pointer; }
+  .chips input { display:none; }
+  .chips span { display:inline-block; padding:7px 14px; border-radius:999px; border:1px solid var(--line);
+                background:var(--card2); font-size:13px; font-weight:500; color:var(--muted); transition:.15s; }
+  .chips input:checked + span { background:rgba(139,108,255,.16); border-color:var(--accent); color:var(--text); }
+  .seg { display:grid; grid-template-columns:repeat(4,1fr); background:var(--bg); border:1px solid var(--line);
+         border-radius:10px; padding:3px; gap:3px; }
+  .seg input { display:none; }
+  .seg span { display:block; text-align:center; padding:8px 4px; border-radius:7px; font-size:13px;
+              color:var(--muted); cursor:pointer; font-weight:500; }
+  .seg input:checked + span { background:var(--card2); color:var(--text); box-shadow:0 1px 0 rgba(255,255,255,.05) inset; }
+
+  /* number stepper */
+  .big { display:flex; align-items:center; gap:10px; }
+  .big input[type=range] { flex:1; accent-color:var(--accent); }
+  .big output { min-width:72px; padding-left:6px; padding-right:6px; text-align:center; padding:6px 0; border-radius:8px; background:var(--card2);
+                border:1px solid var(--line); font-weight:600; font-variant-numeric:tabular-nums; }
+
+  details summary { cursor:pointer; color:var(--muted); font-size:14px; font-weight:600; list-style:none; }
+  details summary::before { content:"▸ "; }
+  details[open] summary::before { content:"▾ "; }
+
+  /* sticky bar */
+  .bar { position:fixed; left:0; right:0; bottom:0; padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+         background:rgba(11,12,16,.85); backdrop-filter:blur(12px); border-top:1px solid var(--line); }
+  .bar-inner { max-width:680px; margin:0 auto; display:flex; gap:10px; }
+  .btn { flex:1; padding:13px; border-radius:12px; border:0; font:600 15px Inter, system-ui; cursor:pointer;
+         text-align:center; text-decoration:none; transition:transform .1s, opacity .15s; }
+  .btn:active { transform:scale(.98); }
+  .primary { background:linear-gradient(135deg, var(--accent), #6f55e8); color:#fff; }
+  .secondary { background:var(--card2); color:var(--text); border:1px solid var(--line); }
+  #msg { max-width:680px; margin:0 auto 8px; font-size:13px; color:var(--muted); word-break:break-all; min-height:0; }
+  #msg.err { color:var(--danger); }
+  .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:24px; }
+  .keylink { float:right; font-weight:500; color:var(--accent2); text-decoration:none; font-size:12.5px; }
+  .keyrow { display:flex; gap:8px; }
+  .keyrow input { flex:1; font-family:ui-monospace, Menlo, monospace; font-size:13px; }
+  .eye { padding:0 14px; border-radius:10px; border:1px solid var(--line); background:var(--card2); color:var(--muted); font:500 13px Inter, system-ui; cursor:pointer; }
+  #service { margin-bottom:4px; }
+  @media (max-width:480px) { .grid2 { grid-template-columns:1fr; } .seg span { font-size:12px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+    </div>
+    <div>
+      <h1>StreamFilter</h1>
+      <p class="sub">Your debrid account, your filters, straight into Stremio.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="num">1</span>Debrid service</h2>
+    <p class="desc">Pick your service and paste your API key.</p>
+    <div class="seg" id="service">
+      <label><input type="radio" name="service" value="torbox"><span>TorBox</span></label>
+      <label><input type="radio" name="service" value="realdebrid"><span>Real-Debrid</span></label>
+      <label><input type="radio" name="service" value="alldebrid"><span>AllDebrid</span></label>
+      <label><input type="radio" name="service" value="premiumize"><span>Premiumize</span></label>
+    </div>
+    <label class="field">API key <a id="keyLink" class="keylink" href="#" target="_blank" rel="noopener">Where do I find it?</a></label>
+    <div class="keyrow">
+      <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="Paste your API key">
+      <button type="button" class="eye" id="eye" aria-label="Show key">Show</button>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>Torrent source</h2>
+    <p class="desc">Where results come from. Paste the plain (no debrid) manifest link of one or more torrent add-ons, one per line. Your debrid key above handles the rest.</p>
+    <textarea id="upstreams" placeholder="https://some-addon.example/manifest.json"></textarea>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>How many results</h2>
+    <p class="desc">Keep the list short and easy to scan.</p>
+    <label class="field">Maximum streams</label>
+    <div class="big"><input type="range" id="maxResults" min="0" max="100" step="1"><output id="maxResultsOut"></output></div>
+    <label class="field">Maximum per resolution</label>
+    <div class="big"><input type="range" id="maxPerResolution" min="0" max="20" step="1"><output id="maxPerResolutionOut"></output></div>
+    <label class="field">Sort by</label>
+    <div class="seg" id="sortBy">
+      <label><input type="radio" name="sort" value="quality"><span>Quality</span></label>
+      <label><input type="radio" name="sort" value="size"><span>Size</span></label>
+      <label><input type="radio" name="sort" value="seeders"><span>Seeders</span></label>
+      <label><input type="radio" name="sort" value="none"><span>Original</span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>Filters</h2>
+    <p class="desc">Hide what you don't want to see.</p>
+    <label class="toggle"><div><b>Cached only</b><small id="cachedNote">Only show files that play instantly</small></div>
+      <span class="switch"><input type="checkbox" id="removeUncached"><span></span></span></label>
+    <label class="toggle"><div><b>Hide HDR</b><small>HDR10 and HDR10+ releases</small></div>
+      <span class="switch"><input type="checkbox" id="excludeHDR"><span></span></span></label>
+    <label class="toggle"><div><b>Hide Dolby Vision</b><small>DV / DoVi releases</small></div>
+      <span class="switch"><input type="checkbox" id="excludeDV"><span></span></span></label>
+    <label class="toggle"><div><b>Hide CAM & telesync</b><small>Low-quality cinema recordings</small></div>
+      <span class="switch"><input type="checkbox" id="excludeCam"><span></span></span></label>
+    <label class="toggle"><div><b>Remove duplicates</b><small>Same file from several sources shown once</small></div>
+      <span class="switch"><input type="checkbox" id="dedupe"><span></span></span></label>
+
+    <label class="field">Resolutions to show</label>
+    <div class="chips" id="resolutions"></div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div><label class="field">Min size (GB)</label><input type="number" id="minSizeGB" min="0" step="0.5" placeholder="No minimum"></div>
+      <div><label class="field">Max size (GB)</label><input type="number" id="maxSizeGB" min="0" step="0.5" placeholder="No maximum"></div>
+    </div>
+  </section>
+
+  <section>
+    <details>
+      <summary>More options</summary>
+      <label class="field">Hide streams containing</label>
+      <input type="text" id="excludeKeywords" placeholder="e.g. 3D, x265, hindi">
+      <label class="field">Only show streams containing (all of)</label>
+      <input type="text" id="requireKeywords" placeholder="e.g. remux">
+      <label class="field">Languages (any of)</label>
+      <input type="text" id="languages" placeholder="e.g. english, multi, 🇬🇧">
+      <div class="grid2" style="margin-top:14px">
+        <div><label class="field">Name shown in Stremio</label><input type="text" id="addonName"></div>
+        <div><label class="field">Source timeout (seconds)</label><input type="number" id="timeoutS" min="1" max="30" step="1"></div>
+      </div>
+    </details>
+  </section>
+
+  <p class="foot">Your settings and key are saved inside your install link, so don't share that link. To change settings later, use the add-on's ⚙️ button in Stremio.</p>
+</main>
+
+<div class="bar">
+  <div id="msg"></div>
+  <div class="bar-inner">
+    <a class="btn primary" id="install" href="#">Install in Stremio</a>
+    <button class="btn secondary" id="copy" type="button">Copy link</button>
+  </div>
+</div>
+
+<script>
+const FALLBACK = {
+  addonName: 'StreamFilter', service: 'torbox', apiKey: '', upstreams: [], maxResults: 20, maxPerResolution: 0,
+  removeUncached: true, excludeHDR: false, excludeDV: false, excludeCam: true, dedupe: true,
+  resolutions: ['2160p','1080p','720p','480p','unknown'], minSizeGB: 0, maxSizeGB: 0,
+  excludeKeywords: [], requireKeywords: [], languages: [], sortBy: 'quality', timeoutMs: 8000,
+};
+let cfg;
+try { cfg = { ...FALLBACK, ...__DEFAULTS__ }; } catch { cfg = FALLBACK; } // works even if opened as a plain file
+const SERVED = /^https?:$/.test(location.protocol);
+const RES = [['2160p','4K'],['1080p','1080p'],['720p','720p'],['480p','SD'],['unknown','Unknown']];
+const $ = (id) => document.getElementById(id);
+
+// fill form
+$('resolutions').innerHTML = RES.map(([v,l]) =>
+  `<label><input type="checkbox" value="${v}" ${cfg.resolutions.includes(v) ? 'checked' : ''}><span>${l}</span></label>`).join('');
+$('upstreams').value = (cfg.upstreams || []).map(u => u + '/manifest.json').join('\n');
+$('addonName').value = cfg.addonName;
+$('timeoutS').value = Math.round((cfg.timeoutMs || 8000) / 1000);
+$('minSizeGB').value = cfg.minSizeGB || '';
+$('maxSizeGB').value = cfg.maxSizeGB || '';
+['excludeKeywords','requireKeywords','languages'].forEach(k => $(k).value = (cfg[k] || []).join(', '));
+['removeUncached','excludeHDR','excludeDV','excludeCam','dedupe'].forEach(k => $(k).checked = !!cfg[k]);
+(document.querySelector(`#sortBy input[value="${cfg.sortBy}"]`) || document.querySelector('#sortBy input')).checked = true;
+(document.querySelector(`#service input[value="${cfg.service}"]`) || document.querySelector('#service input')).checked = true;
+$('apiKey').value = cfg.apiKey || '';
+$('eye').onclick = () => {
+  const show = $('apiKey').type === 'password';
+  $('apiKey').type = show ? 'text' : 'password';
+  $('eye').textContent = show ? 'Hide' : 'Show';
+};
+const SERVICES = {
+  torbox:     { key: 'https://torbox.app/settings',        check: true },
+  realdebrid: { key: 'https://real-debrid.com/apitoken',   check: false },
+  alldebrid:  { key: 'https://alldebrid.com/apikeys/',      check: false },
+  premiumize: { key: 'https://www.premiumize.me/account',   check: true },
+};
+function onService() {
+  const s = SERVICES[document.querySelector('#service input:checked').value];
+  $('keyLink').href = s.key;
+  $('cachedNote').textContent = s.check
+    ? 'Only show files that play instantly'
+    : 'This service doesn’t allow checking ahead: files show as ❔ and cached ones still play instantly';
+}
+document.querySelectorAll('#service input').forEach(i => i.onchange = onService);
+onService();
+
+for (const [id, zero] of [['maxResults','All'], ['maxPerResolution','No cap']]) {
+  const r = $(id), o = $(id + 'Out');
+  r.value = cfg[id];
+  const show = () => o.textContent = +r.value === 0 ? zero : r.value;
+  r.oninput = show; show();
+}
+
+function build() {
+  const list = (v) => v.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+  const c = {
+    addonName: $('addonName').value.trim() || 'StreamFilter',
+    service: document.querySelector('#service input:checked').value,
+    apiKey: $('apiKey').value.trim(),
+    upstreams: list($('upstreams').value),
+    maxResults: +$('maxResults').value,
+    maxPerResolution: +$('maxPerResolution').value,
+    sortBy: document.querySelector('#sortBy input:checked').value,
+    dedupe: $('dedupe').checked,
+    removeUncached: $('removeUncached').checked,
+    excludeHDR: $('excludeHDR').checked,
+    excludeDV: $('excludeDV').checked,
+    excludeCam: $('excludeCam').checked,
+    resolutions: [...document.querySelectorAll('#resolutions input:checked')].map(i => i.value),
+    minSizeGB: +$('minSizeGB').value || 0,
+    maxSizeGB: +$('maxSizeGB').value || 0,
+    excludeKeywords: list($('excludeKeywords').value),
+    requireKeywords: list($('requireKeywords').value),
+    languages: list($('languages').value),
+    timeoutMs: (+$('timeoutS').value || 8) * 1000,
+  };
+  const msg = $('msg');
+  if (!c.apiKey) { msg.className = 'err'; msg.textContent = 'Paste your debrid API key first.'; return null; }
+  if (!c.upstreams.length) { msg.className = 'err'; msg.textContent = 'Add a torrent source link.'; return null; }
+  if (!c.resolutions.length) { msg.className = 'err'; msg.textContent = 'Pick at least one resolution.'; return null; }
+  if (!SERVED) { msg.className = 'err'; msg.textContent = 'Open this page through the StreamFilter server (e.g. http://127.0.0.1:7000) to get an install link.'; return null; }
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(c))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const url = `${location.origin}/${b64}/manifest.json`;
+  msg.className = ''; msg.textContent = '';
+  return url;
+}
+
+$('install').onclick = (e) => {
+  e.preventDefault();
+  const url = build();
+  if (url) location.href = url.replace(/^https?:\/\//, 'stremio://');
+};
+$('copy').onclick = async () => {
+  const url = build();
+  if (!url) return;
+  try { await navigator.clipboard.writeText(url); $('copy').textContent = 'Copied ✓'; }
+  catch { $('msg').textContent = url; $('copy').textContent = 'Copy it from above'; }
+  setTimeout(() => $('copy').textContent = 'Copy link', 1800);
+};
+</script>
+</body>
+</html>

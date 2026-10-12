@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: streamfilter
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server.js
+    healthCheckPath: /manifest.json
